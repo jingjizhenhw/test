@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>环形图和表格</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #main {
+            height: 400px;
+            width: 600px;
+            margin-top: 20px;
+        }
+
+        #table-container {
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .highlight {
+            background-color: #d4edda !important;
+        }
+    </style>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@5.2.1/dist/echarts.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+</head>
+<body>
+    <div id="main"></div>
+    <div id="table-container">
+        <table id="data-table">
+            <thead>
+                <tr>
+                    <th>用户类型</th>
+                    <th>用户人数</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-type="高价值型客户">
+                    <td>{{data[0][0]}}</td>
+                    <td>{{data[0][1]}}</td>
+                </tr>
+                <tr data-type="大众型客户">
+                    <td>{{data[1][0]}}</td>
+                    <td>{{data[1][1]}}</td>
+                </tr>
+                <tr data-type="潜力型客户">
+                    <td>{{data[2][0]}}</td>
+                    <td>{{data[2][1]}}</td>
+                </tr>
+                <tr data-type="低价值型客户">
+                    <td>{{data[3][0]}}</td>
+                    <td>{{data[3][1]}}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <script>
+        $(function () {
+            // Echarts初始化
+            var myEcharts = echarts.init(document.getElementById("main"));
+
+            // Echarts配置
+            var option = {
+                // 提示框
+                tooltip: {},
+                // 图例 展示图表各系列名称
+                legend: {
+                    top: '5%',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 15
+                    },
+                    data: {{ data1|tojson|safe }}
+                },
+                // 系列
+                series: [
+                    {
+                        type: 'pie',
+                        radius: ['50%', '70%'],
+                        // 控制标签显示
+                        label: {
+                            normal: {
+                                show: false,
+                                position: 'center'
+                            },
+                            emphasis: {
+                                show: true,
+                                textStyle: {
+                                    fontSize: 25,
+                                    fontWeight: 'bold',
+                                    color: function (params){
+                                        // 根据鼠标悬停的数据项名称设置文字颜色
+                                        if (params.name === '高价值型客户') {
+                                            return 'red';
+                                        } else if (params.name === '大众型客户') {
+                                            return 'blue';
+                                        } else if (params.name === '潜力型客户') {
+                                            return 'green';
+                                        } else if (params.name === '低价值型客户') {
+                                            return 'orange';
+                                        } else {
+                                            return 'black'; // 其他情况下的默认颜色
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        data: [
+                            { name: '高价值型客户', value: {{ data2[0] }} },
+                            { name: '大众型客户', value: {{ data2[1] }} },
+                            { name: '潜力型客户', value: {{ data2[2] }} },
+                            { name: '低价值型客户', value: {{ data2[3] }} }
+                        ],
+                    }
+                ]
+            };
+
+            // 设置配置项
+            myEcharts.setOption(option);
+
+            // 添加交互效果
+            // 鼠标悬停在饼图块时，同时高亮对应表格行
+            myEcharts.on('mouseover', function (params) {
+                if (params.dataIndex !== undefined) {
+                    var type = option.series[0].data[params.dataIndex].name;
+                    var tr = $('#data-table tbody tr[data-type="' + type + '"]');
+                    tr.addClass('highlight');
+                }
+            });
+            myEcharts.on('mouseout', function () {
+                $('#data-table tbody tr').removeClass('highlight');
+            });
+
+            // 添加交互效果
+            // 鼠标悬停在表格行时，同时高亮饼图提示 * 2
+            $('#data-table tbody tr').hover(
+                function () {
+                    var type = $(this).data("type");
+                    var dataIndex = getTypeIndex(type);
+                    myEcharts.dispatchAction({
+                        type: 'highlight',
+                        seriesIndex: 0,
+                        dataIndex: dataIndex
+                    });
+                    showTooltip($(this).index())
+                    $(this).addClass('highlight');
+                },
+                function () {
+                    var type = $(this).data("type");
+                    var dataIndex = getTypeIndex(type);
+                    myEcharts.dispatchAction({
+                        type: 'downplay',
+                        seriesIndex: 0,
+                        dataIndex: dataIndex
+                    });
+                    hideTooltip()
+                    $(this).removeClass('highlight');
+                }
+            );
+
+            // 显示饼图提示框
+            function showTooltip(dataIndex) {
+                myEcharts.dispatchAction({
+                    type: 'showTip',
+                    seriesIndex: 0,
+                    dataIndex: dataIndex
+                });
+            }
+
+            // 隐藏饼图提示框
+            function hideTooltip() {
+                myEcharts.dispatchAction({
+                    type: 'hideTip',
+                    seriesIndex: 0
+                });
+            }
+
+            // 获取类型在legend中的索引
+            function getTypeIndex(type) {
+                var legendData = option.legend.data;
+                return legendData.indexOf(type);
+            }
+        });
+    </script>
+</body>
+</html>
